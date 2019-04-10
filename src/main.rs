@@ -2,9 +2,13 @@ use failure::Error;
 use structopt::StructOpt;
 
 mod build;
+mod lexer;
 mod search;
 
-use self::{build::{BuildOpts, build_index}, search::{SearchOpts, search_index}};
+use self::{
+    build::{build_index, BuildOpts},
+    search::{search_index, SearchOpts},
+};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "looker", about = "code repository search engine")]
