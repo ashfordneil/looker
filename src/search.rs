@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use tantivy::{
     collector::TopDocs,
-    tokenizer::{Tokenizer, TokenStream},
     query::{FuzzyTermQuery, PhraseQuery, Query},
+    tokenizer::{TokenStream, Tokenizer},
     Index, Term,
 };
 
@@ -27,10 +27,10 @@ pub struct SearchOpts {
 enum SearchType {
     /// Search by file name
     #[structopt(name = "file-name")]
-    FileName{ name: String },
+    FileName { name: String },
     /// Search by file contents
     #[structopt(name = "contents")]
-    Contents{ query: String },
+    Contents { query: String },
 }
 
 pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
@@ -39,7 +39,7 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
 
     let query = {
         match opts.search_term {
-            SearchType::FileName{ name } => {
+            SearchType::FileName { name } => {
                 let field = schema
                     .get_field("file_name")
                     .ok_or_else(|| format_err!("Cannot find field 'file_name' in index"))?;
@@ -47,7 +47,7 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
                 let query = FuzzyTermQuery::new(term, 2, false);
                 Box::new(query) as Box<dyn Query>
             }
-            SearchType::Contents{ query } => {
+            SearchType::Contents { query } => {
                 index.tokenizers().register("c", CTokenizer);
                 let field = schema
                     .get_field("file_contents")
