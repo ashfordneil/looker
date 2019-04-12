@@ -3,17 +3,12 @@ use failure::{format_err, Error};
 use log::debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tantivy::{
-    collector::TopDocs,
-    query::{FuzzyTermQuery, PhraseQuery, Query},
-    tokenizer::{TokenStream, Tokenizer},
-    Index, Term,
-};
+use tantivy::{collector::TopDocs, query::{FuzzyTermQuery, PhraseQuery, Query}, tokenizer::{TokenStream, Tokenizer}, Index, Term, SnippetGenerator};
 
 #[derive(Debug, StructOpt)]
 pub struct SearchOpts {
     /// The directory that the index is located in.
-    #[structopt(long = "index_dir", parse(from_os_str), default_value = ".looker")]
+    #[structopt(long = "index-dir", parse(from_os_str), default_value = ".looker")]
     index_dir: PathBuf,
     /// The maximum number of search results to return
     #[structopt(long = "limit", short = "l", default_value = "3")]
@@ -37,7 +32,7 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
     let index = Index::open_in_dir(opts.index_dir)?;
     let schema = index.schema();
 
-    let query = {
+    let (query, field) =
         match opts.search_term {
             SearchType::FileName { name } => {
                 let field = schema
@@ -45,7 +40,7 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
                     .ok_or_else(|| format_err!("Cannot find field 'file_name' in index"))?;
                 let term = Term::from_field_text(field, name.as_str());
                 let query = FuzzyTermQuery::new(term, 2, false);
-                Box::new(query) as Box<dyn Query>
+                (Box::new(query) as Box<dyn Query>, field)
             }
             SearchType::Contents { query } => {
                 index.tokenizers().register("c", CTokenizer);
@@ -69,18 +64,21 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
                     .map(|text| Term::from_field_text(field, text.as_str()))
                     .collect::<Vec<_>>();
                 let query = PhraseQuery::new(terms);
-                Box::new(query) as Box<dyn Query>
+                (Box::new(query) as Box<dyn Query>, field)
             }
-        }
-    };
+        };
 
     let searcher = index.reader()?.searcher();
+    let highlighting = SnippetGenerator::create(&searcher, &query, field)?;
     let results: Vec<_> = searcher.search(&query, &TopDocs::with_limit(opts.limit))?;
 
+    println!("<html><body>");
     for (_score, result) in results {
         let doc = searcher.doc(result)?;
-        println!("{}", schema.to_json(&doc));
+        let snippet = highlighting.snippet_from_doc(&doc);
+        println!("{}", snippet.to_html());
     }
+    println!("</body></html>");
 
     Ok(())
 }

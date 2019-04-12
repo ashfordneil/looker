@@ -65,8 +65,9 @@ impl<'a> Tokenizer<'a> for CTokenizer {
 
     fn token_stream(&self, text: &'a str) -> Self::TokenStreamImpl {
         let token = Token::default();
+        let elapsed = 0;
 
-        CTokenStream { text, token }
+        CTokenStream { text, token, elapsed }
     }
 }
 
@@ -77,6 +78,8 @@ pub struct CTokenStream<'a> {
     text: &'a str,
     /// The token currently being investigated
     token: Token,
+    /// The amount of characters currently consumed
+    elapsed: usize,
 }
 
 impl<'a> TokenStream for CTokenStream<'a> {
@@ -85,6 +88,7 @@ impl<'a> TokenStream for CTokenStream<'a> {
             let &mut Self {
                 text,
                 ref mut token,
+                ..
             } = self;
 
             let position = {
@@ -109,16 +113,17 @@ impl<'a> TokenStream for CTokenStream<'a> {
 
             self.text = str::from_utf8(&text.as_bytes()[position.end()..]).unwrap();
 
-            if position.as_str().trim() != "" {
-                token.text = position.as_str().trim().into();
-                token.position = token.position.wrapping_add(1);
-                token.offset_from = position.start();
-                token.offset_to = position.end();
+            token.offset_from = self.elapsed;
+            self.elapsed += position.end();
+            token.offset_to = self.elapsed;
 
-                if token.text.len() > (1 << 20) {
-                    // large tokens are generally caused by huge block comments
+            if position.as_str().trim() != "" {
+                if token.offset_to - token.offset_from > (1 << 20) {
                     continue;
                 }
+
+                token.text = position.as_str().trim().into();
+                token.position = token.position.wrapping_add(1);
 
                 return true;
             }
