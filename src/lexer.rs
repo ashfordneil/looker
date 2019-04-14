@@ -68,7 +68,11 @@ impl<'a> Tokenizer<'a> for CTokenizer {
         let token = Token::default();
         let elapsed = 0;
 
-        CTokenStream { text, token, elapsed }
+        CTokenStream {
+            text,
+            token,
+            elapsed,
+        }
     }
 }
 
