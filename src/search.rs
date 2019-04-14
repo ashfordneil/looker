@@ -4,6 +4,7 @@ use log::debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tantivy::{collector::TopDocs, query::{FuzzyTermQuery, PhraseQuery, Query}, tokenizer::{TokenStream, Tokenizer}, Index, Term, SnippetGenerator};
+use crossterm::{Colored, Color};
 
 #[derive(Debug, StructOpt)]
 pub struct SearchOpts {
@@ -72,13 +73,19 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
     let highlighting = SnippetGenerator::create(&searcher, &query, field)?;
     let results: Vec<_> = searcher.search(&query, &TopDocs::with_limit(opts.limit))?;
 
-    println!("<html><body>");
     for (_score, result) in results {
         let doc = searcher.doc(result)?;
         let snippet = highlighting.snippet_from_doc(&doc);
-        println!("{}", snippet.to_html());
+
+        let text = snippet.fragments();
+        let mut last = 0;
+        for item in snippet.highlighted() {
+            let (start, stop) = item.bounds();
+            print!("{}", &text[last..start]);
+            print!("{}{}{}", Colored::Fg(Color::Red), &text[start..stop], Colored::Fg(Color::Black));
+            last = stop;
+        }
     }
-    println!("</body></html>");
 
     Ok(())
 }
