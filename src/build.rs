@@ -26,7 +26,7 @@ pub fn build_index(opts: BuildOpts) -> Result<(), Error> {
     // create the schema
     let mut schema_builder = Schema::builder();
 
-    let file_name = schema_builder.add_text_field("file_name", schema::STRING | schema::STORED);
+    let file_name = schema_builder.add_text_field("file_name", schema::STORED);
     let file_contents = {
         let indexing_options = schema::TextFieldIndexing::default()
             .set_tokenizer("c")
@@ -46,7 +46,7 @@ pub fn build_index(opts: BuildOpts) -> Result<(), Error> {
     index.tokenizers().register("c", CTokenizer);
 
     // write to the index
-    let mut writer = index.writer(100_000_000)?;
+    let mut writer = index.writer(1_000_000_000)?;
     Walk::new(opts.search_dir)
         // remove errors (logging them)
         .filter_map(|file| match file {

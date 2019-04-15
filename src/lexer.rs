@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use log::{error, warn};
+use log::warn;
 use regex::{Regex, RegexBuilder, RegexSet, RegexSetBuilder};
 use std::str;
 use tantivy::tokenizer::{Token, TokenStream, Tokenizer};
@@ -123,7 +123,7 @@ impl<'a> TokenStream for CTokenStream<'a> {
             token.offset_to = self.elapsed;
 
             if position.as_str().trim() != "" {
-                if token.offset_to - token.offset_from > (1 << 20) {
+                if token.offset_to - token.offset_from > (1 << 16) {
                     continue;
                 }
 
