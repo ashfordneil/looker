@@ -1,5 +1,4 @@
 use crate::lexer::CTokenizer;
-use log::info;
 use tantivy::tokenizer::Tokenizer;
 
 /// A highlighter that will notice regions of tokenized text that match a query of multiple terms.

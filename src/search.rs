@@ -87,72 +87,85 @@ pub fn search_index(opts: SearchOpts) -> Result<(), Error> {
             }
         };
 
-        let matches = highlighter.search(file_contents);
-        let points_of_interest = matches
-            .iter()
-            .enumerate()
-            .flat_map(|(index, (start, stop))| {
-                iter::once((*start, index)).chain(iter::once((*stop, index)))
-            })
-            .collect::<BTreeMap<_, _>>();
-
         println!("{}{}{}", Fg(Blue), file_name, Fg(Reset));
-        // find the relevant lines that will need to be printed
-        let mut inside_pattern = false;
-        for line in file_contents.lines() {
-            let start = (line.as_ptr() as usize) - (file_contents.as_ptr() as usize);
-            let stop = start + line.len();
-
-            let mut anything_to_print = false;
-
-            let mut relevant_matches = points_of_interest
-                // get the matches that start or stop inside this line
-                .range(start..stop)
-                .map(|(_position, this_match)| this_match)
-                // turn index into (start, stop)
-                .map(|index| matches[*index])
-                // combine these ranges
-                .sorted()
-                .dedup();
-
-            let mut last_seen = if inside_pattern {
-                // there is a match at the start of this line from the previous line
-                let (_start, match_stop) = relevant_matches.next().unwrap();
-                if match_stop > stop {
-                    // the entire line is inside this match
-                    println!("{}", line);
-                    continue;
-                } else {
-                    anything_to_print = true;
-                    print!("{}{}", &line[..(match_stop - start)], Fg(Reset));
-                    match_stop - start
-                }
-            } else {
-                0
-            };
-
-            for (match_start, match_stop) in relevant_matches {
-                anything_to_print = true;
-                let match_start = match_start - start;
-                print!("{}", &line[last_seen..match_start]);
-
-                if match_stop > stop {
-                    print!("{}{}", Fg(Red), &line[match_start..]);
-                    inside_pattern = true;
-                    break;
-                } else {
-                    let match_stop = match_stop - start;
-                    print!("{}{}{}", Fg(Red), &line[match_start..match_stop], Fg(Reset));
-                    last_seen = match_stop;
-                    inside_pattern = false;
-                }
-            }
-
-            if anything_to_print {
-                println!("{}", &line[last_seen..]);
-            }
-        }
+        print_lines(&highlighter, file_contents);
     }
 
     Ok(())
+}
+
+fn print_lines(highlighter: &Highlighter, contents: &str) {
+    let matches = highlighter.search(contents);
+    let points_of_interest = matches
+        .iter()
+        .enumerate()
+        .flat_map(|(index, (start, stop))| {
+            iter::once((*start, index)).chain(iter::once((*stop, index)))
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let mut currently_inside_pattern = false;
+
+    'line: for line in contents.lines() {
+        let mut printed_anything_this_line = false;
+
+        let start = (line.as_ptr() as usize) - (contents.as_ptr() as usize);
+        let stop = start + line.len();
+
+        let mut relevant_matches = points_of_interest
+            // get the relevant matches that start or stop inside this line
+            .range(start..stop)
+            .map(|(_position, this_match)| this_match)
+            // turn index into (start, stop)
+            .map(|index| matches[*index])
+            // get ready for iterating through
+            .sorted()
+            .dedup();
+
+        let mut last_seen = if currently_inside_pattern {
+            // find the end of the pattern at the start of this line
+            match relevant_matches.next() {
+                Some((_start, match_stop)) if match_stop <= stop => {
+                    let match_stop = match_stop - start;
+
+                    printed_anything_this_line = true;
+                    print!("{}{}", &line[..match_stop], Fg(Reset));
+
+                    match_stop
+                }
+                _ => {
+                    // we are currently inside a pattern
+                    // no patterns start or stop on this line
+                    // therefore this entire line is just part of the pattern
+                    println!("{}", line);
+                    continue 'line;
+                }
+            }
+        } else {
+            // start from the beginning of this line, as we are not currently inside a pattern
+            0
+        };
+        currently_inside_pattern = false;
+
+        for (match_start, match_stop) in relevant_matches {
+            let match_start = match_start - start;
+
+            printed_anything_this_line = true;
+            print!("{}", &line[last_seen..match_start]);
+
+            if match_stop > stop {
+                currently_inside_pattern = true;
+                println!("{}{}", Fg(Red), &line[match_start..]);
+                continue 'line;
+            } else {
+                let match_stop = match_stop - start;
+                print!("{}{}{}", Fg(Red), &line[match_start..match_stop], Fg(Reset));
+                last_seen = match_stop;
+            }
+        }
+
+        if printed_anything_this_line {
+            println!("{}", &line[last_seen..]);
+        }
+    }
 }
