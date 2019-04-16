@@ -2,6 +2,7 @@ use failure::Error;
 use structopt::StructOpt;
 
 mod build;
+mod highlight;
 mod lexer;
 mod search;
 

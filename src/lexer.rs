@@ -87,6 +87,16 @@ pub struct CTokenStream<'a> {
     elapsed: usize,
 }
 
+impl<'a> Iterator for CTokenStream<'a> {
+    // start, stop
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = <Self as TokenStream>::next(self)?;
+        Some((token.offset_from, token.offset_to))
+    }
+}
+
 impl<'a> TokenStream for CTokenStream<'a> {
     fn advance(&mut self) -> bool {
         loop {
